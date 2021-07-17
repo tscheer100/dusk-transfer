@@ -18,8 +18,6 @@ cluster = motor_asyncio.AsyncIOMotorClient(MONGO_URL)
 db = cluster['dusk-bank']
 collection = db['bank']
 
-# test = {'_id':1, 'name':'Test'}
-# collection.insert_one(test)
 
 class Bank(commands.Cog):
     def __init__(self, client):
@@ -35,28 +33,51 @@ class Bank(commands.Cog):
         await self.open_bank(member)
 
     async def open_bank(self, ctx: Union[commands.Context, discord.Member]):
-        ID = None
-        name = None
         if isinstance(ctx, commands.Context):
-            ID = ctx.author.id
-            name = ctx.author.name
+            self.ID = ctx.author.id
+            self.name = ctx.author.name
         elif isinstance(ctx, discord.Member):
-            ID = ctx.id
-            name = ctx.name
-        result = await collection.find_one({'_id': ID})
+            self.ID = ctx.id
+            self.name = ctx.name
+        result = await collection.find_one({'_id': self.ID})
         if result == None:
             print(result)
             wallet = 0
             bank = 0
-            new = {'_id': ID, 'name': name, 'wallet': wallet, 'bank': bank}
+            new = {'_id': self.ID, 'name': self.name, 'wallet': wallet, 'bank': bank}
             await collection.insert_one(new)
             print(new)
         else:
             print("member already has a bank")
 
+    # Commands
+    @commands.command()
+    async def balance(self, ctx, member: discord.Member = None):
+        if not member:
+            await self.open_bank(ctx.author)
+            self.user = ctx.author
+            self.ID = ctx.author.id
+        else:
+            await self.open_bank(member)
+            self.user = member
+            self.ID = member.id
+
+        result = await collection.find_one({'_id': self.ID})
+        wallet_amt = result['wallet']
+        bank_amt = result['bank']
+        print(wallet_amt)
+        print(bank_amt)
+
+        embed = discord.Embed(
+            title = f"{self.user.display_name}'s balance",
+            color = discord.Color.purple()
+        )
+        embed.add_field(name = "Wallet balance", value = wallet_amt)
+        embed.add_field(name = "Bank balance", value = bank_amt)
+        embed.set_footer(icon_url = self.user.avatar_url, text = f"requested by {self.user.name}")
+        await ctx.send(embed = embed)
 
 
-    
 #FIX THE FOLLOWING!!
 
     # @on_member_join.error()
