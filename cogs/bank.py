@@ -1,15 +1,14 @@
+import os
+import random
 from discord import member
 from discord.ext.commands.core import command
-import os
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 from discord.ext.commands import context, errors
-import pymongo
-from pymongo import MongoClient
-from pymongo import errors
 from motor import motor_asyncio
 from typing import Union
+
 
 load_dotenv('./.env')
 MONGO_URL = os.getenv('MONGO_URL')
@@ -51,7 +50,7 @@ class Bank(commands.Cog):
             print("member already has a bank")
 
     # Commands
-    @commands.command()
+    @commands.command(aliases = ["bal", "wallet", "money"])
     async def balance(self, ctx, member: discord.Member = None):
         if not member:
             await self.open_bank(ctx.author)
@@ -65,8 +64,6 @@ class Bank(commands.Cog):
         result = await collection.find_one({'_id': self.ID})
         wallet_amt = result['wallet']
         bank_amt = result['bank']
-        print(wallet_amt)
-        print(bank_amt)
 
         embed = discord.Embed(
             title = f"{self.user.display_name}'s balance",
@@ -76,26 +73,34 @@ class Bank(commands.Cog):
         embed.add_field(name = "Bank balance", value = bank_amt)
         embed.set_footer(icon_url = self.user.avatar_url, text = f"requested by {self.user.name}")
         await ctx.send(embed = embed)
+    @balance.error
+    async def balance_error(self, ctx, err):
+        if isinstance(err, errors.MissingRequiredArgument):
+            return
 
-
-#FIX THE FOLLOWING!!
-
-    # @on_member_join.error()
-    # async def on_member_join_error(self, err):
-    #     if isinstance(err, pymongo.errors.DuplicateKeyError):
-    #         print("User already has a balance")
-
-    # commands
-    # @commands.command(aliases = ["bal", "wallet", "money"])
-    # async def balance( self, ctx):
-    #     ID = ctx.author.id
-    #     print(ID)
+    @commands.command()
+    @commands.cooldown(1,60, commands.BucketType.user)
+    async def beg(self, ctx):
+        await self.open_bank(ctx)
+        self.user = ctx.author
+        self.ID = ctx.author.id
         
+        result = await collection.find_one({'_id': self.ID})
+        wallet_amt = result['wallet']
+        bank_amt = result['bank']
+        earnings = random.randrange(100)
+        if wallet_amt + bank_amt < 200:
+            await ctx.send(f"Someone gave you **{earnings}** coins!")
+            new_wallet = wallet_amt + earnings
+            await collection.update_one({'_id': self.ID}, {'$set': {'wallet': new_wallet} })
+        else:
+            await ctx.send("You can only beg if your net worth is below __**200 coins**__")
+    @beg.error 
+    async def beg_error(self, ctx, err):
+        if isinstance(err, commands.CommandOnCooldown):
+            msg = "**You are on a cooldown!** please wait **{:.2f}s**".format(err.retry_after)   
+            await ctx.send(msg)
 
-    # @commands.command()
-    # @commands.command(1,60, commands.BucketType.user)
-    # async def beg(self,ctx):
-        
 
 
     # @commands.command()
