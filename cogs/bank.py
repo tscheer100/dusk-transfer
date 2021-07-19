@@ -1,6 +1,5 @@
 import os
 import random
-from discord import member
 from discord.ext.commands.core import command
 from dotenv import load_dotenv
 import discord
@@ -74,9 +73,54 @@ class Bank(commands.Cog):
         embed.set_footer(icon_url = self.user.avatar_url, text = f"requested by {self.user.name}")
         await ctx.send(embed = embed)
     @balance.error
-    async def balance_error(self, ctx, err):
+    async def balance_error(self, err):
         if isinstance(err, errors.MissingRequiredArgument):
             return
+
+    @commands.command(aliases = ["dep"])
+    async def deposit(self, ctx, amount = None):
+        await self.open_bank(ctx.author)
+        ID = ctx.author.id
+        user = await collection.find_one({'_id': ID})
+
+        wallet_amt = user['wallet']
+        bank_amt = user['bank']
+
+        if amount == None:
+            await ctx.send("Invalid syntax, try `.deposit <amount>`")
+            return
+
+        new_wallet = wallet_amt - int(amount)
+        new_bank = bank_amt + int(amount)
+        if new_wallet >= 0:
+            collection.update_one({'_id': self.ID}, {'$set': {'wallet': new_wallet} })
+            collection.update_one({'_id': self.ID}, {'$set': {'bank': new_bank} })
+            await ctx.send(f"You have deposited **{amount}** coins!")
+        else:
+            await ctx.send("You don't have enough in your wallet to deposit that much!")
+
+    @commands.command()
+    async def withdraw(self, ctx, amount = None):
+        await self.open_bank(ctx.author)
+        ID = ctx.author.id
+        user = await collection.find_one({'_id': ID})
+
+        wallet_amt = user['wallet']
+        bank_amt = user['bank']
+
+        if amount == None:
+            await ctx.send("Invalid syntax, try `.withdraw <amount>`")
+            return
+
+        new_wallet = wallet_amt + int(amount)
+        new_bank = bank_amt - int(amount)
+
+        if new_bank >= 0:
+            collection.update_one({'_id': self.ID}, {'$set': {'wallet': new_wallet} })
+            collection.update_one({'_id': self.ID}, {'$set': {'bank': new_bank} })
+            await ctx.send(f"You have withdrawn **{amount}** coins!")
+        else:
+            await ctx.send("You don't have enough in your bank to withdraw that much!")
 
     @commands.command()
     @commands.cooldown(1,60, commands.BucketType.user)
@@ -100,29 +144,6 @@ class Bank(commands.Cog):
         if isinstance(err, commands.CommandOnCooldown):
             msg = "**You are on a cooldown!** please wait **{:.2f}s**".format(err.retry_after)   
             await ctx.send(msg)
-
-
-
-    # @commands.command()
-    # @commands.cooldown(1,60, commands.BucketType.user)
-    # async def beg(self, ctx):
-    #     await self.open_account(ctx.author)
-    #     self.user = ctx.author
-    #     users = await self.get_bank_data()
-    #     wallet_amt = users[str(self.user.id)]["wallet"]
-    #     bank_amt = users[str(self.user.id)]["bank"]
-    #     earnings = random.randrange(100)
-
-    #     if wallet_amt + bank_amt < 200:
-    #         await ctx.send(f"Someone gave you **{earnings}** coins!")
-    #         users[str(self.user.id)]["wallet"] += earnings
-    #     else:
-    #         await ctx.send("You can only beg if your net worth is below __**200 coins**__")
-
-    #     with open("bank.json", "w") as f:
-    #         json.dump(users, f)
-
-    #     return self.user
 
     @commands.command()
     async def status(self, ctx):
