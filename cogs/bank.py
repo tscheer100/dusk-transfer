@@ -50,10 +50,12 @@ class Bank(commands.Cog):
     # Commands
     @commands.command(aliases = ["bal", "wallet", "money"])
     async def balance(self, ctx, member: discord.Member = None):
+        req = ctx.author
         if not member:
             await self.open_bank(ctx.author)
             self.user = ctx.author
             self.ID = ctx.author.id
+            
         else:
             await self.open_bank(member)
             self.user = member
@@ -69,7 +71,7 @@ class Bank(commands.Cog):
         )
         embed.add_field(name = "Wallet balance", value = wallet_amt)
         embed.add_field(name = "Bank balance", value = bank_amt)
-        embed.set_footer(icon_url = self.user.avatar_url, text = f"requested by {self.user.name}")
+        embed.set_footer(icon_url = req.avatar_url, text = f"requested by {req.display_name}")
         await ctx.send(embed = embed)
     @balance.error
     async def balance_error(self, err):
