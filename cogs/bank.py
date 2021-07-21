@@ -1,5 +1,6 @@
 import os
 import random
+from discord import member
 from discord.ext.commands.core import command
 from dotenv import load_dotenv
 import discord
@@ -8,14 +9,12 @@ from discord.ext.commands import context, errors
 from motor import motor_asyncio
 from typing import Union
 
-
 load_dotenv('./.env')
 MONGO_URL = os.getenv('MONGO_URL')
 
 cluster = motor_asyncio.AsyncIOMotorClient(MONGO_URL)
 db = cluster['dusk-bank']
 collection = db['bank']
-
 
 class Bank(commands.Cog):
     def __init__(self, client):
@@ -145,9 +144,42 @@ class Bank(commands.Cog):
             msg = "**You are on a cooldown!** please wait **{:.2f}s**".format(err.retry_after)   
             await ctx.send(msg)
 
-    @commands.command()
-    async def status(self, ctx):
-        await ctx.send("status called")
+    @commands.command(aliases = ["send","give"])
+    async def gift(self, ctx, Member: discord.Member, amount = None):
+        await self.open_bank(ctx.author)
+        await self.open_bank(member)
+        ID = ctx.author.id
+        MEM_ID = Member.id
         
+        user = await collection.find_one({'_id': ID})
+        mem = await collection.find_one({'_id': MEM_ID})
+        wallet_amt = user['wallet']
+        mem_amt = mem['wallet']
+        if amount == None:
+            await ctx.send("Please enter the amount")
+            print("amount is None_type")
+            return
+
+        amount = int(amount)
+
+        if amount > user['wallet']: # <-- problem starts here?
+            await ctx.send("Insufficient amount in your wallet")
+            return
+        if amount == 0:
+            await ctx.send(f"Sent {Member.display_name} a paperclip and chewed gum. \nYou good?")
+            return
+        if amount < 0:
+            await ctx.send("Amount must be positive!")
+            return
+        
+        await collection.update_one({'_id': ID}, {'$set': {'wallet': wallet_amt + (-1*amount)}})
+        await collection.update_one({'_id': MEM_ID}, {'$set': {'wallet': mem_amt + amount}})
+
+        await ctx.send(f"You sent {amount} coins to {Member.display_name}")
+    @gift.error
+    async def gift_error(self, ctx, err):
+        if isinstance(err, errors.MemberNotFound):
+            await ctx.send("Member not found. Try `.gift @member <amount>`")
+
 def setup(client):
     client.add_cog(Bank(client))
