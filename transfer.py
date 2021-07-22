@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 
-
 intents = discord.Intents(members = True, messages = True, guilds = True)
 
 client = commands.Bot(intents = intents, command_prefix = ".", status = discord.Status.online, activity = discord.Game("just a testing bot"), help_command = None)

@@ -1,5 +1,7 @@
+from logging import error
 import os
 import random
+import asyncio
 from discord import member
 from discord.ext.commands.core import command
 from dotenv import load_dotenv
@@ -77,6 +79,8 @@ class Bank(commands.Cog):
     async def balance_error(self, err):
         if isinstance(err, errors.MissingRequiredArgument):
             return
+        else:
+            raise error
 
     @commands.command(aliases = ["dep"])
     async def deposit(self, ctx, amount = None):
@@ -182,6 +186,107 @@ class Bank(commands.Cog):
     async def gift_error(self, ctx, err):
         if isinstance(err, errors.MemberNotFound):
             await ctx.send("Member not found. Try `.gift @member <amount>`")
+        else:
+            raise error
+
+    # This method is wonky.
+    @commands.command(aliases = ["slot"])
+    async def slots(self, ctx, amount = None):
+        await self.open_bank(ctx.author)
+        user = await collection.find_one({'_id': ctx.author.id})
+        wallet = user['wallet']
+
+        if amount == None:
+            await ctx.send("Please enter the amount.")
+            return
+        else:
+            amount = int(amount)
+        if amount > wallet:
+            await ctx.send("Insufficient funds in your wallet.")
+            return
+        if amount < 0:
+            await ctx.send("Amount can't be negative.")
+        final = []
+
+        # dusk emojis
+
+        # among_rand = "<a:among_rand:855159685538512937>"
+        # choices = ["<:among_yellow:855213922180005969>",
+        # "<:among_white:855213922062958593>",
+        # "<:among_red:855160363090706464>",
+        # "<:among_purple:855160523939381278>",
+        # "<:among_cyan:855213921899773984>",
+        # "<:among_blue:855160063495897130>"]
+ 
+        # test server emojis
+        among_rand = "<a:among_rand:848648377922224229>"
+        choices = ["<:among_blue:848646255252471868>",
+        "<:among_purple:848646255264399370>",
+        "<:among_red:848646255248146523>",
+        # "<:among_yellow:855192733555621938>",
+        # "<:among_cyan:855194895333720115>", removed to make chances more fair
+        # "<:among_white:855196037647171595>"
+        ]
+        
+        first = ""
+        done = ""
+        duplicate_check = set()
+
+        # setting up final and results
+        for i in range(3):
+            final.append(random.choice(choices))
+        
+        for k in range(len(final)):
+            done += final[k]
+            done += " "
+            duplicate_check.add(final[k])
+
+        initial_embed = discord.Embed(
+            title = "The slots begin to whirl furiously...",
+            color = discord.Color.dark_purple()
+        )
+        initial = among_rand + " " + among_rand + " " + among_rand
+        initial_embed.add_field(name = initial, value = "you wait anxiously...")
+        msg = await ctx.send(embed = initial_embed)
+        await asyncio.sleep(1)
+
+        first_embed = discord.Embed(
+            title = "The slots begin to whirl furiously...",
+            color = discord.Color.dark_purple()
+        )
+        first += final[0] + " " + among_rand + " " + among_rand
+        first_embed.add_field(name = first, value = "you wait anxiously...")
+        await msg.edit(embed = first_embed)
+
+        await asyncio.sleep(1)
+
+        second_embed = discord.Embed(
+            title = "The slots begin to whirl furiously...",
+            color = discord.Color.dark_purple()
+        )
+        second = final[0] + " " + final[1] + " " + among_rand
+        second_embed.add_field(name = second, value = "you wait anxiously...")
+        await msg.edit(embed = second_embed)
+
+        await asyncio.sleep(1)
+        results_embed = discord.Embed(
+            title = "The slots finally stop spinning...",
+            color = discord.Color.dark_purple()
+        )
+        print(duplicate_check)
+        len_diff = len(final) - len(duplicate_check)
+        # results, send after slot finishes
+        if len_diff == 2:
+            await collection.update_one({'_id': ctx.author.id}, {'$set': {'wallet': wallet + (4*amount)} })
+            results_embed.add_field(name = done, value = f"OH BABY A TRIPLE! You've won {4*amount} coins! :Fire16:")
+        elif len_diff == 1:
+            await collection.update_one({'_id': ctx.author.id}, {'$set': {'wallet': wallet + amount} })
+            results_embed.add_field(name = done, value = f"Congratulations! You've won {2*amount} coins! :Fire16:")
+        else:
+            await collection.update_one({'_id': ctx.author.id}, {'$set': {'wallet': wallet - amount} })
+            results_embed.add_field(name= done, value = f" Oh no! You've lost {amount} coins.")
+        await msg.edit(embed = results_embed)
+    
 
 def setup(client):
     client.add_cog(Bank(client))
