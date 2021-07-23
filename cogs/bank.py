@@ -287,6 +287,43 @@ class Bank(commands.Cog):
             results_embed.add_field(name= done, value = f" Oh no! You've lost {amount} coins.")
         await msg.edit(embed = results_embed)
     
+    @commands.command(aliases = ["steal", "mug"])
+    @commands.cooldown(1,14400, commands.BucketType.user)
+    async def rob(self, ctx, member: discord.Member):
+        await self.open_bank(ctx.author)
+        await self.open_bank(member)
+        VICTIM_ID = await collection.find_one({'_id': member.id})
+        VICTIM_ID = VICTIM_ID['_id']
+        THEIF_ID = await collection.find_one({'_id': ctx.author.id})
+        THEIF_ID = THEIF_ID['_id']
+        victim_wallet = await collection.find_one({'_id': VICTIM_ID})
+        victim_wallet = victim_wallet['wallet']
+        thief_wallet = await collection.find_one({'_id': THEIF_ID})
+        thief_wallet = thief_wallet['wallet']
+
+        earnings = random.randrange(1, int(victim_wallet/4))
+        success = bool(random.getrandbits(1))
+
+        if thief_wallet >= (victim_wallet/4):
+            if victim_wallet < 100:
+                await ctx.send(f"It's not worth it, {member.display_name} only has {victim_wallet}")
+                return
+            else:
+                if success:
+                    await ctx.send(f"You stole **{earnings}** from **{member.display_name}'s** wallet!")
+                    await collection.update_one({'_id': THEIF_ID},{'$set': {'wallet': (thief_wallet + earnings)} })
+                    await collection.update_one({'_id': VICTIM_ID}, {'$set': {'wallet': (victim_wallet - earnings)} }) 
+                else:
+                    await ctx.send(f"Oops! you got caught! You had to pay **{member.display_name}** **{earnings}** coins.")
+                    await collection.update_one({'_id': THEIF_ID},{'$set': {'wallet': (thief_wallet - earnings)} })
+                    await collection.update_one({'_id': VICTIM_ID}, {'$set': {'wallet': (victim_wallet + earnings)} }) 
+        else:
+            await ctx.send("""If you get caught, you might not have enough to pay the fee.\nDon't rob from people unless you have at least a fourth of their wallet balance.""")
+    @rob.error 
+    async def rob_error(self, ctx, err):
+        if isinstance(err, commands.CommandOnCooldown):
+            msg = "**You are on a cooldown!** please wait **{:.2f}s**".format(err.retry_after)   
+            await ctx.send(msg)
 
 def setup(client):
     client.add_cog(Bank(client))
